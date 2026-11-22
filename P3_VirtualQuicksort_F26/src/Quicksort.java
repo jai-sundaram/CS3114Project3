@@ -35,11 +35,12 @@ import java.io.PrintWriter;
  *   OPTION 2: Assistance Disclosure
  *
  *   During the preparation of this assignment,
- *   Jai Sundaram and Yaswanth Uppalapati used Claude Code & Codex in Quicksort.java, 
- *   BufferPool.java, VirtualQuicksort.java, BufferPoolTest.java, QuicksortTest.java, 
- *   Examples.java, FileGenerator.java, Checkfile.java, and FileType.java for assistance
- *   with debugging, code optimization, and syntax improvement.
- *  
+ *   Jai Sundaram and Yaswanth Uppalapati used Claude Code
+ *   and Codex in Quicksort.java, BufferPool.java,
+ *   VirtualQuicksort.java, BufferPoolTest.java,
+ *   QuicksortTest.java, Examples.java, FileGenerator.java,
+ *   CheckFile.java, and FileType.java for assistance with
+ *   debugging, code optimization, and syntax improvement.
  *
  *   After using this tool, I/we reviewed and edited
  *   the content as needed to ensure its accuracy and
