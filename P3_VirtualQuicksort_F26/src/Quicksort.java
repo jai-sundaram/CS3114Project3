@@ -3,19 +3,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 
-/**
- * Sorts a binary file of 4-byte records in place using Quicksort. The file
- * itself acts as the array, and all accesses to it pass through an LRU buffer
- * pool. Run statistics are appended to a separate statistics file.
- */
-
-/**
- * The class containing the main method.
- *
- * @author {Your Name Here}
- * @version {Put Something Here}
- */
-
 /*
  * On my honor:
  *
@@ -44,17 +31,15 @@ import java.io.PrintWriter;
  * - Regarding the use of generative AI tools or other
  *   assistance, I declare ONE of the following:
  *
- *   OPTION 1: No Assistance
- *
- *   I have not used any assistance for this assignment
- *   beyond the resources explicitly permitted by the
- *   course policies.
  *
  *   OPTION 2: Assistance Disclosure
  *
  *   During the preparation of this assignment,
- *   [student name] used [tool name] in [specific parts
- *   of the assignment] for [specific purpose].
+ *   Jai Sundaram and Yaswanth Uppalapati used Claude Code & Codex in Quicksort.java, 
+ *   BufferPool.java, VirtualQuicksort.java, BufferPoolTest.java, QuicksortTest.java, 
+ *   Examples.java, FileGenerator.java, Checkfile.java, and FileType.java for assistance
+ *   with debugging, code optimization, and syntax improvement.
+ *  
  *
  *   After using this tool, I/we reviewed and edited
  *   the content as needed to ensure its accuracy and
@@ -71,7 +56,15 @@ import java.io.PrintWriter;
  *   academic integrity policies.
  */
 
-
+/**
+ * The class containing the main method. Sorts a binary file of 4-byte records
+ * in place using Quicksort. The file itself acts as the array, and all
+ * accesses to it pass through an LRU buffer pool. Run statistics are appended
+ * to a separate statistics file.
+ *
+ * @author Jai Sundaram, Yaswanth Uppalapati
+ * @version 2026-11-22
+ */
 public class Quicksort {
 
     /** The number of command line arguments the program requires. */
@@ -91,6 +84,27 @@ public class Quicksort {
 
     /** The most buffers the program allows. */
     private static final int MAX_BUFFERS = 20;
+
+    /** Opens the statistics file so that new lines go after the old ones. */
+    private static final boolean APPEND_TO_FILE = true;
+
+    /** Starts the statistics line naming the sorted file. */
+    private static final String FILE_LABEL = "Standard sort on ";
+
+    /** Starts the statistics line for the number of cache hits. */
+    private static final String HITS_LABEL = "Cache Hits: ";
+
+    /** Starts the statistics line for the number of disk reads. */
+    private static final String READS_LABEL = "Disk Reads: ";
+
+    /** Starts the statistics line for the number of disk writes. */
+    private static final String WRITES_LABEL = "Disk Writes: ";
+
+    /** Starts the statistics line for the running time of the sort. */
+    private static final String TIME_LABEL = "Sort Time: ";
+
+    /** Ends the statistics line for the running time of the sort. */
+    private static final String TIME_UNITS = " ms";
 
     /**
      * Sorts a file and appends statistics about the run. Problems are reported
@@ -153,8 +167,10 @@ public class Quicksort {
             / VirtualQuicksort.RECORD_BYTES);
         BufferPool pool; // Declared here so its statistics outlive the file
         long sortMillis; // The running time of the sort in milliseconds
+        // The pool for the data file, closed (and so flushed) after the sort
         try (BufferPool opened = new BufferPool(dataFile, numBuffers)) {
             pool = opened;
+            // Sorts the records that the pool gives access to
             VirtualQuicksort sorter = new VirtualQuicksort(pool, numRecords);
             long startTime = System.currentTimeMillis(); // When the sort began
             sorter.sort();
@@ -184,13 +200,14 @@ public class Quicksort {
         BufferPool pool,
         long sortMillis)
         throws IOException {
+        // Writes lines to the end of the statistics file
         try (PrintWriter out = new PrintWriter(new FileWriter(statFile,
-            true))) {
-            out.println("Standard sort on " + dataFile);
-            out.println("Cache Hits: " + pool.getCacheHits());
-            out.println("Disk Reads: " + pool.getDiskReads());
-            out.println("Disk Writes: " + pool.getDiskWrites());
-            out.println("Sort Time: " + sortMillis + " ms");
+            APPEND_TO_FILE))) {
+            out.println(FILE_LABEL + dataFile);
+            out.println(HITS_LABEL + pool.getCacheHits());
+            out.println(READS_LABEL + pool.getDiskReads());
+            out.println(WRITES_LABEL + pool.getDiskWrites());
+            out.println(TIME_LABEL + sortMillis + TIME_UNITS);
         }
     }
 }

@@ -5,8 +5,8 @@ import java.io.*;
  * is a pair of short ints with the first short being the key value
  *
  * @author CS3114 Instructors and TAs
+ * @version 2026-11-08
  */
-
 public class CheckFile {
 
     /**
@@ -19,16 +19,16 @@ public class CheckFile {
      *             either an IOException or a FileNotFoundException
      */
     public static boolean check(String filename) throws Exception {
-        DataInputStream dis;
+        DataInputStream dis; // The stream that reads the file
         dis = new DataInputStream(new BufferedInputStream(new FileInputStream(
             filename)));
 
-        boolean isError = false;
-        int reccnt = 0;
+        boolean isError = false; // Whether any key was out of order
+        int reccnt = 0; // The number of records processed
 
         // smallest short possible, nothing is less than it:
         short prev = Short.MIN_VALUE;
-        short curr;
+        short curr; // The key of the record being checked
 
         try {
             while (true) {

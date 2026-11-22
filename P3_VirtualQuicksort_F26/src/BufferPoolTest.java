@@ -8,8 +8,8 @@ import student.TestCase;
  * Tests the buffer pool directly: its LRU replacement policy, its statistics,
  * and its handling of dirty blocks and of requests that span blocks.
  *
- * @author {Your Name Here}
- * @version 2026-11-08
+ * @author Jai Sundaram, Yaswanth Uppalapati
+ * @version 2026-11-22
  */
 public class BufferPoolTest extends TestCase {
 
@@ -22,8 +22,44 @@ public class BufferPoolTest extends TestCase {
     /** The number of blocks in the test file. */
     private static final int NUM_BLOCKS = 3;
 
+    /** The byte position where the second block (block 1) starts. */
+    private static final int BLOCK_ONE_START = BLOCK;
+
+    /** The byte position where the third block (block 2) starts. */
+    private static final int BLOCK_TWO_START = 2 * BLOCK;
+
     /** The number of bytes to request in most tests. */
     private static final int REQUEST_BYTES = 2;
+
+    /** A pool size that holds only one block. */
+    private static final int ONE_BUFFER = 1;
+
+    /** A pool size that holds two of the file's blocks. */
+    private static final int TWO_BUFFERS = 2;
+
+    /** A pool size that holds every block of the file. */
+    private static final int ALL_BUFFERS = NUM_BLOCKS;
+
+    /** A byte written to a block that will be evicted. */
+    private static final byte EVICTED_MARK = 99;
+
+    /** A byte written to a block and read back before it reaches the disk. */
+    private static final byte PENDING_MARK = 42;
+
+    /** A byte written before the pool is flushed. */
+    private static final byte FLUSHED_MARK = 77;
+
+    /** A byte written before the pool is closed. */
+    private static final byte CLOSED_MARK = 88;
+
+    /** The byte written at the end of a block by a spanning request. */
+    private static final byte SPAN_FIRST_MARK = 50;
+
+    /** The byte written at the start of a block by a spanning request. */
+    private static final byte SPAN_SECOND_MARK = 60;
+
+    /** The contents of a file that is shorter than a block. */
+    private static final byte[] SHORT_FILE = { 1, 2, 3, 4 };
 
     /** Receives bytes from the pool and supplies bytes to it. */
     private byte[] space;
@@ -41,6 +77,7 @@ public class BufferPoolTest extends TestCase {
     public void setUp() throws Exception {
         super.setUp();
         byte[] contents = new byte[NUM_BLOCKS * BLOCK]; // The whole test file
+        // block is the id of the block being filled
         for (int block = 0; block < NUM_BLOCKS; block++) {
             Arrays.fill(contents, block * BLOCK, (block + 1) * BLOCK,
                 (byte)block);
@@ -70,13 +107,14 @@ public class BufferPoolTest extends TestCase {
      *             If a file access fails.
      */
     public void testHitsAndReads() throws IOException {
-        pool = new BufferPool(POOL_FILE, 1);
-        pool.getBytes(space, REQUEST_BYTES, BLOCK);
+        pool = new BufferPool(POOL_FILE, ONE_BUFFER);
+        pool.getBytes(space, REQUEST_BYTES, BLOCK_ONE_START);
         assertEquals(1, space[0]);
         assertEquals(1, pool.getDiskReads());
         assertEquals(0, pool.getCacheHits());
 
-        pool.getBytes(space, REQUEST_BYTES, BLOCK + BLOCK - REQUEST_BYTES);
+        // The last bytes of the same block
+        pool.getBytes(space, REQUEST_BYTES, BLOCK_TWO_START - REQUEST_BYTES);
         assertEquals(1, pool.getDiskReads());
         assertEquals(1, pool.getCacheHits());
         assertEquals(0, pool.getDiskWrites());
@@ -91,21 +129,21 @@ public class BufferPoolTest extends TestCase {
      *             If a file access fails.
      */
     public void testLeastRecentlyUsedIsEvicted() throws IOException {
-        pool = new BufferPool(POOL_FILE, 2);
+        pool = new BufferPool(POOL_FILE, TWO_BUFFERS);
         pool.getBytes(space, REQUEST_BYTES, 0); // Load block 0
-        pool.getBytes(space, REQUEST_BYTES, BLOCK); // Load block 1
+        pool.getBytes(space, REQUEST_BYTES, BLOCK_ONE_START); // Load block 1
         pool.getBytes(space, REQUEST_BYTES, 0); // Block 1 becomes the LRU
         assertEquals(2, pool.getDiskReads());
         assertEquals(1, pool.getCacheHits());
 
-        pool.getBytes(space, REQUEST_BYTES, 2L * BLOCK); // Evicts block 1
+        pool.getBytes(space, REQUEST_BYTES, BLOCK_TWO_START); // Evicts block 1
         assertEquals(3, pool.getDiskReads());
 
         pool.getBytes(space, REQUEST_BYTES, 0); // Block 0 is still resident
         assertEquals(3, pool.getDiskReads());
         assertEquals(2, pool.getCacheHits());
 
-        pool.getBytes(space, REQUEST_BYTES, BLOCK); // Block 1 was evicted
+        pool.getBytes(space, REQUEST_BYTES, BLOCK_ONE_START); // Was evicted
         assertEquals(4, pool.getDiskReads());
     }
 
@@ -118,19 +156,19 @@ public class BufferPoolTest extends TestCase {
      *             If a file access fails.
      */
     public void testDirtyBlockWrittenOnEviction() throws IOException {
-        pool = new BufferPool(POOL_FILE, 1);
-        space[0] = 99;
-        pool.putBytes(space, 1, BLOCK);
+        pool = new BufferPool(POOL_FILE, ONE_BUFFER);
+        space[0] = EVICTED_MARK;
+        pool.putBytes(space, 1, BLOCK_ONE_START);
         assertEquals(0, pool.getDiskWrites());
 
         pool.getBytes(space, REQUEST_BYTES, 0); // Evicts the dirty block
         assertEquals(1, pool.getDiskWrites());
 
-        pool.getBytes(space, REQUEST_BYTES, 2L * BLOCK); // Evicts a clean one
+        pool.getBytes(space, REQUEST_BYTES, BLOCK_TWO_START); // Evicts a clean
         assertEquals(1, pool.getDiskWrites());
 
-        pool.getBytes(space, 1, BLOCK); // The change comes back from the disk
-        assertEquals(99, space[0]);
+        pool.getBytes(space, 1, BLOCK_ONE_START); // The change comes back
+        assertEquals(EVICTED_MARK, space[0]);
     }
 
 
@@ -141,12 +179,12 @@ public class BufferPoolTest extends TestCase {
      *             If a file access fails.
      */
     public void testReadSeesPendingWrite() throws IOException {
-        pool = new BufferPool(POOL_FILE, 2);
-        space[0] = 42;
+        pool = new BufferPool(POOL_FILE, TWO_BUFFERS);
+        space[0] = PENDING_MARK;
         pool.putBytes(space, 1, 0);
         space[0] = 0;
         pool.getBytes(space, 1, 0);
-        assertEquals(42, space[0]);
+        assertEquals(PENDING_MARK, space[0]);
         assertEquals(0, pool.getDiskWrites());
     }
 
@@ -159,11 +197,11 @@ public class BufferPoolTest extends TestCase {
      *             If a file access fails.
      */
     public void testFlushAndClose() throws IOException {
-        pool = new BufferPool(POOL_FILE, 3);
-        space[0] = 77;
+        pool = new BufferPool(POOL_FILE, ALL_BUFFERS);
+        space[0] = FLUSHED_MARK;
         pool.putBytes(space, 1, 0);
-        pool.putBytes(space, 1, BLOCK);
-        pool.getBytes(space, 1, 2L * BLOCK); // A clean block is not written
+        pool.putBytes(space, 1, BLOCK_ONE_START);
+        pool.getBytes(space, 1, BLOCK_TWO_START); // A clean block isn't written
 
         pool.flush();
         assertEquals(2, pool.getDiskWrites());
@@ -173,14 +211,15 @@ public class BufferPoolTest extends TestCase {
         pool.getBytes(space, 1, 0);
         assertEquals(3, pool.getDiskReads()); // Still resident after a flush
 
-        space[0] = 88;
-        pool.putBytes(space, 1, 2L * BLOCK);
+        space[0] = CLOSED_MARK;
+        pool.putBytes(space, 1, BLOCK_TWO_START);
         pool.close();
         assertEquals(3, pool.getDiskWrites());
+        // The file's contents after the pool is closed
         byte[] saved = Files.readAllBytes(new File(POOL_FILE).toPath());
-        assertEquals(77, saved[0]);
-        assertEquals(77, saved[BLOCK]);
-        assertEquals(88, saved[2 * BLOCK]);
+        assertEquals(FLUSHED_MARK, saved[0]);
+        assertEquals(FLUSHED_MARK, saved[BLOCK_ONE_START]);
+        assertEquals(CLOSED_MARK, saved[BLOCK_TWO_START]);
     }
 
 
@@ -191,20 +230,21 @@ public class BufferPoolTest extends TestCase {
      *             If a file access fails.
      */
     public void testRequestSpanningBlocks() throws IOException {
-        pool = new BufferPool(POOL_FILE, 2);
-        pool.getBytes(space, REQUEST_BYTES, BLOCK - 1);
+        pool = new BufferPool(POOL_FILE, TWO_BUFFERS);
+        pool.getBytes(space, REQUEST_BYTES, BLOCK_ONE_START - 1);
         assertEquals(0, space[0]);
         assertEquals(1, space[1]);
         assertEquals(2, pool.getDiskReads());
 
-        space[0] = 50;
-        space[1] = 60;
-        pool.putBytes(space, REQUEST_BYTES, BLOCK - 1);
+        space[0] = SPAN_FIRST_MARK;
+        space[1] = SPAN_SECOND_MARK;
+        pool.putBytes(space, REQUEST_BYTES, BLOCK_ONE_START - 1);
         pool.close();
         assertEquals(2, pool.getDiskWrites());
+        // The file's contents after the pool is closed
         byte[] saved = Files.readAllBytes(new File(POOL_FILE).toPath());
-        assertEquals(50, saved[BLOCK - 1]);
-        assertEquals(60, saved[BLOCK]);
+        assertEquals(SPAN_FIRST_MARK, saved[BLOCK_ONE_START - 1]);
+        assertEquals(SPAN_SECOND_MARK, saved[BLOCK_ONE_START]);
     }
 
 
@@ -215,13 +255,12 @@ public class BufferPoolTest extends TestCase {
      *             If a file access fails.
      */
     public void testShortFinalBlock() throws IOException {
-        byte[] shortFile = { 1, 2, 3, 4 }; // Less than one block of data
-        Files.write(new File(POOL_FILE).toPath(), shortFile);
-        pool = new BufferPool(POOL_FILE, 1);
+        Files.write(new File(POOL_FILE).toPath(), SHORT_FILE);
+        pool = new BufferPool(POOL_FILE, ONE_BUFFER);
         pool.getBytes(space, REQUEST_BYTES, REQUEST_BYTES);
-        assertEquals(3, space[0]);
+        assertEquals(SHORT_FILE[REQUEST_BYTES], space[0]);
         pool.putBytes(space, 1, 0);
         pool.close();
-        assertEquals(shortFile.length, new File(POOL_FILE).length());
+        assertEquals(SHORT_FILE.length, new File(POOL_FILE).length());
     }
 }

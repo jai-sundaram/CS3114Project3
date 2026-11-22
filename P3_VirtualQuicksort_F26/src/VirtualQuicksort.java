@@ -20,8 +20,8 @@ import java.util.Random;
  * </li>
  * </ul>
  *
- * @author {Your Name Here}
- * @version 2026-11-08
+ * @author Jai Sundaram, Yaswanth Uppalapati
+ * @version 2026-11-22
  */
 public class VirtualQuicksort {
 
@@ -185,8 +185,11 @@ public class VirtualQuicksort {
      */
     private short choosePivot(int low, int high) throws IOException {
         int third = (high - low + 1) / PIVOT_SAMPLES; // Length of each third
+        // A key sampled from the first third of the range
         short first = readKey(low + random.nextInt(third));
+        // A key sampled from the middle third of the range
         short second = readKey(low + third + random.nextInt(third));
+        // A key sampled from the last third of the range
         short last = readKey(low + third + third + random.nextInt(third));
         return (short)Math.max(Math.min(first, second), Math.min(Math.max(
             first, second), last));
@@ -209,6 +212,7 @@ public class VirtualQuicksort {
         long position = positionOf(low); // The range's location in the file
         pool.getBytes(smallRange, numBytes, position);
         boolean moved = false; // Whether any record changed position
+        // i is the byte offset of the record being inserted
         for (int i = RECORD_BYTES; i < numBytes; i += RECORD_BYTES) {
             int record = smallRangeView.getInt(i); // The record to insert
             short key = smallRangeView.getShort(i); // The key to insert

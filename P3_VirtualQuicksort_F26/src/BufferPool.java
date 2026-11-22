@@ -11,8 +11,8 @@ import java.io.RandomAccessFile;
  * Disk writes are deferred until a dirty block is evicted or flushed, so a
  * block that is never modified is never written.
  *
- * @author {Your Name Here}
- * @version 2026-11-08
+ * @author Jai Sundaram, Yaswanth Uppalapati
+ * @version 2026-11-22
  */
 public class BufferPool implements Closeable {
 
@@ -69,6 +69,7 @@ public class BufferPool implements Closeable {
         lruList = new Buffer();
         lruList.next = lruList;
         lruList.previous = lruList;
+        // i counts the buffers created so far
         for (int i = 0; i < numBuffers; i++) {
             linkAtFront(new Buffer());
         }
@@ -96,6 +97,7 @@ public class BufferPool implements Closeable {
             int offset = (int)(current % BLOCK_BYTES); // Position in block
             // The request may continue into the next block
             int chunk = Math.min(numBytes - copied, BLOCK_BYTES - offset);
+            // The buffer holding the block that contains the next byte
             Buffer buffer = acquire((int)(current / BLOCK_BYTES));
             System.arraycopy(buffer.data, offset, destination, copied, chunk);
             copied += chunk;
@@ -124,6 +126,7 @@ public class BufferPool implements Closeable {
             int offset = (int)(current % BLOCK_BYTES); // Position in block
             // The request may continue into the next block
             int chunk = Math.min(numBytes - copied, BLOCK_BYTES - offset);
+            // The buffer holding the block that contains the next byte
             Buffer buffer = acquire((int)(current / BLOCK_BYTES));
             System.arraycopy(source, copied, buffer.data, offset, chunk);
             buffer.dirty = true;
