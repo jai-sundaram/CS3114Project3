@@ -92,8 +92,9 @@ public class QuicksortTest extends TestCase {
      * Pairs of a number of blocks and a number of buffers, used by the random
      * binary file test.
      */
-    private static final int[][] BLOCK_BUFFER_PAIRS = { { 1, 2 }, { 2, 1 },
-        { 5, 1 }, { 5, 3 }, { 8, 20 }, { 20, 2 } };
+    private static final int[][] BLOCK_BUFFER_PAIRS = {
+        { 1, 2 }, { 2, 1 }, { 5, 1 }, { 5, 3 }, { 8, 20 }, { 20, 2 }
+    };
 
     /** The position of the number of blocks in a pair. */
     private static final int PAIR_BLOCKS = 0;
